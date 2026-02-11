@@ -1,21 +1,21 @@
-## Complete CI/CD Pipeline with EKS and private DockerHub registry
+## Complete CI/CD Pipeline with EKS and AWS ECR
 
 This project was a part of the TWN DevOps Bootcamp.
 
 ## Technologies used:
-Kubernetes, Jenkins, AWS EKS, Docker Hub, Java, Maven, Linux, Docker,Git
+Kubernetes, Jenkins, AWS EKS, AWS ECR, Java, Maven, Linux, Docker, Git
 
 ## Project Description:
-- Write K8s manifest files for Deployment and Service configuration
-- Integrate deploy step in the CI/CD pipeline to deploy newly built application image from DockerHub private registry to the EKS cluster
-- Deploy web application image from AWS ECR private Docker registry in K8s cluster
+- Create private AWS ECR Docker repository
+- Adjust Jenkinsfile to build and push Docker Image to AWS ECR
+- Integrate deploying to K8s cluster in the CI/CD pipeline from AWS ECR private registry
 - So the complete CI/CD project we build has the following configuration:
   
   a) CI step: Increment version
   
   b) CI step: Build artifact for Java Maven application
 
-  c) CI step: Build and push Docker image to DockerHub
+  c) CI step: Build and push Docker image to AWS ECR
 
   d) CD step: Deploy new application version to EKS cluster
 
