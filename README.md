@@ -20,3 +20,89 @@ Kubernetes, Jenkins, AWS EKS, AWS ECR, Java, Maven, Linux, Docker, Git
   d) CD step: Deploy new application version to EKS cluster
 
   e) CD step: Commit the version update
+
+1. Add a Kubernetes Deploy Stage
+
+Create K8s manifests (deployment.yaml, service.yaml) under a new kubernetes/ folder.
+
+Use placeholders like ${IMAGE_NAME} and ${APP_NAME} for the image tag and application name.
+
+
+Define environment variables in the Jenkinsfile (e.g., IMAGE_NAME, APP_NAME).
+
+Set them in an environment block or per‑stage block.
+
+
+Install envsubst in the Jenkins agent container (via apt-get install gettext).
+
+Use it to replace the placeholders in the YAML files at runtime.
+
+
+Apply the rendered manifests:
+sh "envsubst < kubernetes/deployment.yaml | kubectl apply -f -"
+sh "envsubst < kubernetes/service.yaml    | kubectl apply -f -"
+
+Create a Docker‑registry secret (once) so the cluster can pull private images:
+kubectl create secret docker-registry my-registry-key \
+    --docker-server=docker.io \
+    --docker-username=<user> \
+    --docker-password=<pass>
+
+Reference the secret in the pod spec (imagePullSecrets).
+
+
+
+2. Switch from Docker Hub to AWS ECR
+
+Create an ECR repository (e.g., java-maven-app) in the AWS console.
+Generate ECR credentials:
+aws ecr get-login-password --region <region>
+
+Username is always AWS; password is the output above.
+
+
+Add these credentials to Jenkins (type “Username with password”, ID ecr‑creds).
+Create a matching Kubernetes secret for ECR:
+kubectl create secret docker-registry ecr-registry-key \
+    --docker-server=<account-id>.dkr.ecr.<region>.amazonaws.com \
+    --docker-username=AWS \
+    --docker-password=$(aws ecr get-login-password)
+
+Update the Jenkinsfile:
+
+Add DOCKER_REPO (full ECR URI) and DOCKER_REPO_SERVER (ECR server part) as environment
+variables.
+Use the new credentials ID (ecr‑creds) for Docker login.
+Tag and push the image to ${DOCKER_REPO}:${IMAGE_NAME}.
+Pass DOCKER_REPO_SERVER as the third argument to docker login.
+
+
+Reference the ECR secret (ecr-registry-key) in the deployment YAML (imagePullSecrets).
+
+3. Run the Pipeline
+
+Commit changes, trigger the Jenkins job.
+Pipeline builds the JAR, creates a Docker image, pushes it to ECR, substitutes variables in the K8s
+manifests, applies them, and the new pod runs the image pulled from ECR.
+
+Result: A fully automated CI/CD flow that builds, versions, pushes Docker images to AWS ECR, and
+deploys them to an EKS‑hosted Kubernetes cluster, with all image/tag values injected dynamically via
+environment variables.
+
+What did I build?
+I created a complete end‑to‑end CI/CD pipeline that:
+
+Compiles a Java‑Maven application and packages it as a Docker image.
+Version‑increments the image on every run, ensuring traceable releases.
+Pushes the image to a container registry – first to Docker Hub, then migrated to AWS Elastic
+Container Registry (ECR).
+Deploys the image to a Kubernetes cluster (EKS) using dynamically‑generated Kubernetes
+manifests (Deployment & Service).
+Handles private‑registry authentication by creating Docker‑registry secrets both in Jenkins
+(for docker login) and in the Kubernetes cluster (for imagePullSecrets).
+Uses environment‑variable substitution (envsubst) to inject the current image tag and
+application name into the YAML files at runtime, keeping the manifests reusable and source‑control
+friendly.
+
+All pipeline logic lives in a single Jenkinsfile, making the process transparent, reproducible,
+and easy to extend (e.g., moving code to a shared library).
